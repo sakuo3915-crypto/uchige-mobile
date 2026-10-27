@@ -9,17 +9,31 @@
 (()=>{'use strict';
 // 注文ごとに差し替えるデータ。ゲームエンジンと顧客データを分離したデモ。
 const GAME={title:'サクゲー ～ヒデアキの逆襲～',hero:{name:'ヒデアキ',attack:'ハゲビーム',lines:['ハゲビーム！','いくぞ！'],color:'#49bbdc'},bosses:[{name:'シュウ',kind:'tear',color:'#a584eb',hp:15,lines:['ベイ！ベイ！','うわぁぁん！','ベイッ！'],defeat:'うわぁん！'},{name:'カイ',kind:'sick',color:'#73b985',hp:18,lines:['ゲロ！','ゲロゲロ！','うぷっ…'],defeat:'ゲロォ…'},{name:'エリコ',kind:'ping',color:'#e9987e',hp:36,lines:['卓球部、なめんなよ！','スマッシュ！','この球、返せる？'],defeat:'エビ…',transform:{name:'エビコ',kind:'shrimp',color:'#f08b3d',line:'エリコはエビコになった！',lines:['エビフライ攻撃！','エビフライ攻撃！','エビフライ攻撃！']}}],ending:'ヒデアキは平和な日常を取り戻し、\n楽しく麻雀をして過ごしましたとさ。'};
-const $=id=>document.getElementById(id),cv=$('game'),ctx=cv.getContext('2d'),field=$('field'),pad=$('pad'),knob=$('knob'),fire=$('fire'),overlay=$('overlay'),special=$('special'),specialCount=$('specialCount');const R=(a,b)=>a+Math.random()*(b-a),clamp=(v,a,b)=>Math.max(a,Math.min(b,v));let W=360,H=500,dpr=1,last=0,t=0,mode='menu',hero=null,boss=null,stage=0,transformed=false,shots=[],enemyShots=[],particles=[],stars=[],shotTimer=0,enemyTimer=0,bubble=null,bubbleTimer=0,inv=0,lock=0,fireHeld=false,fireId=null,padId=null,lastX=0,lastY=0,keys={},stageToken=0,specialHits=0,chargeEffect=0,melosTimer=0,melosActive=0,mamachariEffect=0;
+const $=id=>document.getElementById(id),cv=$('game'),ctx=cv.getContext('2d'),field=$('field'),pad=$('pad'),knob=$('knob'),fire=$('fire'),overlay=$('overlay'),special=$('special'),specialCount=$('specialCount');const R=(a,b)=>a+Math.random()*(b-a),clamp=(v,a,b)=>Math.max(a,Math.min(b,v));let W=360,H=500,dpr=1,last=0,t=0,mode='menu',hero=null,boss=null,stage=0,transformed=false,shots=[],enemyShots=[],particles=[],stars=[],shotTimer=0,enemyTimer=0,bubble=null,bubbleTimer=0,inv=0,lock=0,fireHeld=false,fireId=null,padId=null,lastX=0,lastY=0,keys={},stageToken=0,specialHits=0,chargeEffect=0,melosTimer=0,melosActive=0,mamachariEffect=0,beer=null,beerDropped=false,beerDelay=0,stageElapsed=0;
 function resize(){const r=field.getBoundingClientRect();W=Math.max(r.width,240);H=Math.max(r.height,250);dpr=Math.min(window.devicePixelRatio||1,2);cv.width=Math.round(W*dpr);cv.height=Math.round(H*dpr);ctx.setTransform(dpr,0,0,dpr,0,0);stars=Array.from({length:50},()=>({x:R(0,W),y:R(0,H),v:R(8,34),r:R(.6,1.7)}));if(hero){hero.x=clamp(hero.x,20,W-20);hero.y=clamp(hero.y,H*.38,H-25)}if(boss){boss.x=clamp(boss.x,45,W-45)}}window.addEventListener('resize',resize);resize();
 function say(who,txt,secs=2){bubble={who,txt,until:t+secs}}function cfg(){return GAME.bosses[stage]}function hud(){let n=Math.min(stage+1,GAME.bosses.length);$('stage').textContent=`STAGE ${n} / ${GAME.bosses.length}　HP ${'♥'.repeat(Math.max(hero?.hp||0,0))}`;$('hp').style.width=`${Math.max(0,hero?.hp||0)*20}%`}
-function newStage(){let b=cfg();if(!b)return;boss={x:W/2,y:Math.max(60,Math.min(110,H*.19)),hp:b.hp,max:b.hp,age:0};transformed=false;special.classList.remove('show');specialHits=0;melosTimer=0;melosActive=0;shots=[];enemyShots=[];enemyTimer=1.65;lock=.75;bubbleTimer=3.3;say('boss',`${b.name}「${b.lines[0]}」`,2.4);hud()}
-function start(){++stageToken;t=0;mode='play';overlay.classList.add('hide');hero={x:W/2,y:H*.79,hp:5};stage=0;inv=0;lock=0;shotTimer=0;fireHeld=false;fireId=null;padId=null;particles=[];special.classList.remove('show');mamachariEffect=0;newStage()}
-function end(win){mode=win?'win':'lose';fireHeld=false;fire.classList.remove('down');special.classList.remove('show');overlay.classList.remove('hide');$('title').textContent=win?'ゲームクリア！':'ゲームオーバー';$('desc').textContent=win?GAME.ending:'もう一度挑戦してみよう！\n敵の弾を避けて、攻撃ボタンを長押し！';$('start').textContent='もう一度遊ぶ'}
+function newStage(){let b=cfg();if(!b)return;beer=null;beerDropped=false;stageElapsed=0;beerDelay=R(5.5,8.0);boss={x:W/2,y:Math.max(60,Math.min(110,H*.19)),hp:b.hp,max:b.hp,age:0};transformed=false;special.classList.remove('show');specialHits=0;melosTimer=0;melosActive=0;shots=[];enemyShots=[];enemyTimer=1.65;lock=.75;bubbleTimer=3.3;say('boss',`${b.name}「${b.lines[0]}」`,2.4);hud()}
+function start(retry=false){let retryStage=retry?stage:0;++stageToken;t=0;mode='play';overlay.classList.add('hide');hero={x:W/2,y:H*.79,hp:5};stage=retryStage;inv=0;lock=0;shotTimer=0;fireHeld=false;fireId=null;padId=null;particles=[];special.classList.remove('show');mamachariEffect=0;newStage()}
+function end(win){mode=win?'win':'lose';fireHeld=false;fire.classList.remove('down');special.classList.remove('show');overlay.classList.remove('hide');$('title').textContent=win?'ゲームクリア！':'ゲームオーバー';$('desc').textContent=win?GAME.ending:`${cfg().name}戦から再挑戦できるよ！\nHPを全回復してリスタート。`;$('start').textContent=win?'最初から遊ぶ':'このボスから再挑戦'}
 function next(){let tok=stageToken;lock=999;shots=[];enemyShots=[];setTimeout(()=>{if(mode!=='play'||tok!==stageToken)return;stage++;if(stage>=GAME.bosses.length){end(true)}else{newStage()}},1400)}
 function spark(x,y,color,count=12){for(let i=0;i<count;i++){let a=R(0,Math.PI*2),s=R(30,150);particles.push({x,y,vx:Math.cos(a)*s,vy:Math.sin(a)*s,color,life:R(.3,.8)})}}
 function currentKind(){return transformed?cfg().transform.kind:cfg().kind}function currentName(){return transformed?cfg().transform.name:cfg().name}
 function enemyFire(){let kind=currentKind(),n=kind==='tear'?3:kind==='sick'?4:kind==='ping'?5:4;let base=Math.atan2(hero.y-boss.y,hero.x-boss.x),speed=kind==='tear'?106:kind==='sick'?110:kind==='ping'?120:100;for(let i=0;i<n;i++){let theta=base+(i-(n-1)/2)*(kind==='shrimp'?.30:.19);enemyShots.push({x:boss.x,y:boss.y+21,vx:Math.cos(theta)*speed,vy:Math.sin(theta)*speed,kind,r:kind==='shrimp'?7:kind==='tear'?7:8,spin:R(0,6)})}}
 function update(dt){t+=dt;for(let s of stars){s.y+=s.v*dt;if(s.y>H){s.y=0;s.x=R(0,W)}}for(let p of particles){p.x+=p.vx*dt;p.y+=p.vy*dt;p.life-=dt}particles=particles.filter(p=>p.life>0);if(mode!=='play')return;if(inv>0)inv-=dt;if(mamachariEffect>0)mamachariEffect-=dt;if(lock>0){lock-=dt;return}let dx=(keys.ArrowRight||keys.d?1:0)-(keys.ArrowLeft||keys.a?1:0),dy=(keys.ArrowDown||keys.s?1:0)-(keys.ArrowUp||keys.w?1:0),l=Math.hypot(dx,dy)||1;hero.x=clamp(hero.x+dx/l*235*dt,21,W-21);hero.y=clamp(hero.y+dy/l*235*dt,H*.38,H-26);
+ stageElapsed+=dt;
+ if(!beerDropped && stageElapsed>=beerDelay){
+   beerDropped=true;
+   beer={x:clamp(hero.x+R(-60,60),28,W-28),y:-20,vy:Math.max(63,H*.17),spin:0};
+ }
+ if(beer){
+   beer.y+=beer.vy*dt;beer.spin+=dt*3;
+   if(Math.hypot(beer.x-hero.x,beer.y-(hero.y-10))<33){
+     hero.hp=Math.min(5,hero.hp+2);hud();
+     spark(beer.x,beer.y,'#ffec81',16);
+     say('hero','ビールで回復！',1.4);
+     beer=null;
+   }else if(beer.y>H+28){beer=null;}
+ }
  boss.age+=dt;
  if(currentKind()==='ping'){melosTimer+=dt;if(melosTimer>=7.5){melosTimer=0;melosActive=2.3;say('boss','走れメロス！',2.1)}}
  if(melosActive>0)melosActive-=dt;
@@ -75,7 +89,15 @@ function drawProjectile(s){
 }
 function drawBubble(){if(!bubble||bubble.until<t||!boss)return;let isHero=bubble.who==='hero',x=isHero?hero.x:boss.x,y=isHero?hero.y-62:boss.y+54,txt=bubble.txt;if(!txt)return;ctx.save();let fontSize=txt.length>16?12:14;ctx.font=`900 ${fontSize}px system-ui`;let bw=Math.min(W-16,Math.max(105,ctx.measureText(txt).width+25)),bh=35;x=clamp(x,8+bw/2,W-8-bw/2);y=clamp(y,18,H-18);rr(x-bw/2,y-bh/2,bw,bh,13,'#fffef5','#2b3b61');ctx.fillStyle='#1c3054';ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillText(txt,x,y, bw-14);ctx.restore()}
 function draw(){let grad=ctx.createLinearGradient(0,0,0,H);grad.addColorStop(0,'#58ace3');grad.addColorStop(.45,'#437cb5');grad.addColorStop(1,'#17395e');ctx.fillStyle=grad;ctx.fillRect(0,0,W,H);for(let s of stars)circle(s.x,s.y,s.r,'#e2fbff96');ctx.fillStyle='#123b6866';for(let i=0;i<8;i++){let y=(i*100+(t*20)%100)%H;ctx.fillRect(0,y,W,3)}ctx.fillStyle='#163d5488';ctx.beginPath();ctx.moveTo(0,H*.78);for(let i=0;i<=W;i+=30)ctx.lineTo(i,H*.78+Math.sin(i*.037)*13);ctx.lineTo(W,H);ctx.lineTo(0,H);ctx.fill();if(mode==='menu')return;
- if(boss&&boss.hp>0){rr(14,10,W-28,14,8,'#1a3157','#aed1ff');rr(16,12,(W-32)*clamp(boss.hp/boss.max,0,1),10,5,transformed?'#fd549f':'#ffa65e');ctx.font='900 12px system-ui';ctx.fillStyle='#fff';ctx.textAlign='center';ctx.fillText(transformed?'FINAL  VS エビコ':`VS ${currentName()}`,W/2,43);drawBoss()}if(hero)drawHero();for(let s of shots){ctx.save();ctx.shadowColor='#fff2a0';ctx.shadowBlur=18;rr(s.x-5,s.y-19,10,32,5,'#ffe34e');rr(s.x-2,s.y-23,4,35,2,'#ffffff');circle(s.x,s.y-22,6,'#fffbcd');ctx.restore()}for(let s of enemyShots)drawProjectile(s);for(let p of particles){ctx.globalAlpha=clamp(p.life*1.7,0,1);circle(p.x,p.y,3,p.color)}ctx.globalAlpha=1;
+ if(boss&&boss.hp>0){rr(14,10,W-28,14,8,'#1a3157','#aed1ff');rr(16,12,(W-32)*clamp(boss.hp/boss.max,0,1),10,5,transformed?'#fd549f':'#ffa65e');ctx.font='900 12px system-ui';ctx.fillStyle='#fff';ctx.textAlign='center';ctx.fillText(transformed?'FINAL  VS エビコ':`VS ${currentName()}`,W/2,43);drawBoss()}if(hero)drawHero();for(let s of shots){ctx.save();ctx.shadowColor='#fff2a0';ctx.shadowBlur=18;rr(s.x-5,s.y-19,10,32,5,'#ffe34e');rr(s.x-2,s.y-23,4,35,2,'#ffffff');circle(s.x,s.y-22,6,'#fffbcd');ctx.restore()}for(let s of enemyShots)drawProjectile(s);
+ if(beer){
+   ctx.save();ctx.translate(beer.x,beer.y);
+   ctx.rotate(Math.sin(beer.spin)*.11);
+   ctx.shadowColor='#ffdd4e';ctx.shadowBlur=13;
+   ctx.font='31px system-ui';ctx.textAlign='center';ctx.textBaseline='middle';
+   ctx.fillText('🍺',0,0);ctx.restore();
+ }
+ for(let p of particles){ctx.globalAlpha=clamp(p.life*1.7,0,1);circle(p.x,p.y,3,p.color)}ctx.globalAlpha=1;
  if(mamachariEffect>0&&hero){
   ctx.save();ctx.globalAlpha=Math.min(1,mamachariEffect*1.8);
   ctx.font='bold 30px system-ui';ctx.textAlign='center';
@@ -97,9 +119,9 @@ special.addEventListener('pointerdown',e=>{
  enemyShots=[];spark(boss.x,boss.y,'#ffe682',35);
  boss.hp=Math.max(0,boss.hp-12);
  if(boss.hp<=0){say('boss','エビ…',1.3);next()}
- else setTimeout(()=>{if(mode==='play'&&transformed) {specialCount.textContent='連打 0/8';special.classList.add('show')}},5000);
+ else setTimeout(()=>{if(mode==='play'&&transformed&&stage===GAME.bosses.length-1) {specialCount.textContent='連打 0/8';special.classList.add('show')}},5000);
 });
-$('start').addEventListener('click',()=>{if(mode==='paused'){mode='play';overlay.classList.add('hide')}else start()});$('pause').addEventListener('click',()=>{if(mode==='play'){mode='paused';fireHeld=false;fire.classList.remove('down');$('title').textContent='一時停止';$('desc').textContent='再開を押すと続きから遊べるよ。';$('start').textContent='再開';overlay.classList.remove('hide')}else if(mode==='paused'){mode='play';overlay.classList.add('hide')}});
+$('start').addEventListener('click',()=>{if(mode==='paused'){mode='play';overlay.classList.add('hide')}else start(mode==='lose')});$('pause').addEventListener('click',()=>{if(mode==='play'){mode='paused';fireHeld=false;fire.classList.remove('down');$('title').textContent='一時停止';$('desc').textContent='再開を押すと続きから遊べるよ。';$('start').textContent='再開';overlay.classList.remove('hide')}else if(mode==='paused'){mode='play';overlay.classList.add('hide')}});
 // 見た目はジョイスティック、入力は安定した相対移動式タッチパッド。
 pad.addEventListener('pointerdown',e=>{if(mode!=='play'||padId!==null)return;padId=e.pointerId;lastX=e.clientX;lastY=e.clientY;pad.classList.add('active');try{pad.setPointerCapture(e.pointerId)}catch{}e.preventDefault()});pad.addEventListener('pointermove',e=>{if(padId!==e.pointerId||mode!=='play')return;let dx=e.clientX-lastX,dy=e.clientY-lastY;hero.x=clamp(hero.x+dx*1.5,21,W-21);hero.y=clamp(hero.y+dy*1.5,H*.38,H-26);knob.style.setProperty('--kx',clamp(dx*2,-17,17)+'px');knob.style.setProperty('--ky',clamp(dy*2,-17,17)+'px');lastX=e.clientX;lastY=e.clientY;e.preventDefault()});for(let ev of ['pointerup','pointercancel','lostpointercapture'])pad.addEventListener(ev,e=>{if(e.pointerId===padId){padId=null;pad.classList.remove('active');knob.style.setProperty('--kx','0px');knob.style.setProperty('--ky','0px')}});
 fire.addEventListener('pointerdown',e=>{if(mode!=='play'||fireId!==null)return;fireId=e.pointerId;fireHeld=true;fire.classList.add('down');try{fire.setPointerCapture(e.pointerId)}catch{}e.preventDefault()});for(let ev of ['pointerup','pointercancel','lostpointercapture'])fire.addEventListener(ev,e=>{if(e.pointerId===fireId){fireId=null;fireHeld=false;fire.classList.remove('down')}});window.addEventListener('keydown',e=>{keys[e.key]=true;if(['ArrowUp','ArrowDown','ArrowLeft','ArrowRight',' '].includes(e.key))e.preventDefault()});window.addEventListener('keyup',e=>{keys[e.key]=false});document.addEventListener('visibilitychange',()=>{if(document.hidden){fireHeld=false;keys={};padId=null;fireId=null;pad.classList.remove('active');fire.classList.remove('down');knob.style.setProperty('--kx','0px');knob.style.setProperty('--ky','0px')}});
